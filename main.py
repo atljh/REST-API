@@ -68,6 +68,10 @@ class Everyone(object):
         return  # SELECT * FROM artists
 
 
+class Search(object):
+    @cherrypy.expose
+    def index(self):
+        pass
 
 if __name__ == '__main__':
     cherrypy.quickstart(Router())
