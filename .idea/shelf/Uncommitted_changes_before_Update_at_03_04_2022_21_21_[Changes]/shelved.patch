@@ -1,0 +1,100 @@
+Index: .idea/dataSources.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/dataSources.xml b/.idea/dataSources.xml
+new file mode 100644
+--- /dev/null	(date 1648746469785)
++++ b/.idea/dataSources.xml	(date 1648746469785)
+@@ -0,0 +1,12 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
++    <data-source source="LOCAL" name="identifier.sqlite" uuid="f99874b3-1725-4c6b-9e5a-f9098315f556">
++      <driver-ref>sqlite.xerial</driver-ref>
++      <synchronize>true</synchronize>
++      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
++      <jdbc-url>jdbc:sqlite:identifier.sqlite</jdbc-url>
++      <working-dir>$ProjectFileDir$</working-dir>
++    </data-source>
++  </component>
++</project>
+\ No newline at end of file
+Index: main.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import cherrypy\r\n\r\n\r\nclass Router(object):\r\n    def __init__(self):\r\n        self.albums = Album()\r\n        self.song = Song()\r\n        self.band = Band()\r\n        self.everyone = Everyone()\r\n        self.search = Search()\r\n\r\n    def _cp_dispatch(self, vpath):\r\n        if len(vpath) == 0:  # /\r\n            return self.everyone\r\n\r\n        if len(vpath) == 1:  # /search\r\n            resource_type = vpath.pop(0)\r\n            if resource_type == 'search':\r\n                return self.search\r\n            else:\r\n                return 'unknown type'\r\n\r\n        if len(vpath) == 2:  # /artist/<artist>\r\n            vpath.pop(0)\r\n            cherrypy.request.params['name'] = vpath.pop()\r\n            return self.band\r\n\r\n        if len(vpath) == 4:  # /artist/<artist>/song/<song>\r\n            vpath.pop(0)\r\n            cherrypy.request.params['artist'] = vpath.pop(0)  # artist name\r\n            resource_type = vpath.pop(0)\r\n\r\n            if resource_type == 'song':\r\n                cherrypy.request.params['name'] = vpath.pop(0)  # /song name/\r\n                return self.song\r\n\r\n            elif resource_type == 'album':\r\n                cherrypy.request.params['title'] = vpath.pop(0)  # /album title/\r\n                return self.albums\r\n\r\n            else:\r\n                return 'unknown type'\r\n\r\n        return vpath\r\n\r\n\r\nclass Band(object):\r\n    @cherrypy.expose\r\n    def index(self, name):\r\n        return  # f'SELECT * FROM {name}'\r\n\r\n\r\nclass Album(object):\r\n    @cherrypy.expose\r\n    def index(self, artist, title):\r\n        return 'About %s by %s...' % (artist, title)\r\n\r\n\r\nclass Song(object):\r\n    @cherrypy.expose\r\n    def index(self, artist, name):\r\n        return 'Song %s by %s...' % (artist, name)\r\n\r\n\r\nclass Everyone(object):\r\n    @cherrypy.expose\r\n    def index(self):\r\n        return  # SELECT * FROM artists\r\n\r\n\r\nclass Search(object):\r\n    @cherrypy.expose\r\n    def index(self):\r\n        pass\r\n\r\n\r\n\r\nif __name__ == '__main__':\r\n    cherrypy.quickstart(Router())\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/main.py b/main.py
+--- a/main.py	(revision e4ad933c4d30f0663a4f5a75f74202a4ddaa2fcc)
++++ b/main.py	(date 1648405063315)
+@@ -73,7 +73,5 @@
+     def index(self):
+         pass
+ 
+-
+-
+ if __name__ == '__main__':
+     cherrypy.quickstart(Router())
+Index: .idea/sqldialects.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/sqldialects.xml b/.idea/sqldialects.xml
+new file mode 100644
+--- /dev/null	(date 1648746451171)
++++ b/.idea/sqldialects.xml	(date 1648746451171)
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="SqlDialectMappings">
++    <file url="file://$PROJECT_DIR$/main2.py" dialect="GenericSQL" />
++    <file url="PROJECT" dialect="SQLite" />
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/.name
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/.name b/.idea/.name
+new file mode 100644
+--- /dev/null	(date 1648915900892)
++++ b/.idea/.name	(date 1648915900892)
+@@ -0,0 +1,1 @@
++main2.py
+\ No newline at end of file
+Index: translate.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/translate.py b/translate.py
+new file mode 100644
+--- /dev/null	(date 1649008505530)
++++ b/translate.py	(date 1649008505530)
+@@ -0,0 +1,18 @@
++"""x = {"artist": [{"artist_name": "Joe Perry"}, {"artist_name": "Joey Kramer"}], "album": [], "song": [{"song_name": "Anything Goes"}]}
++
++for i in x.values():
++    for v in i:
++        print(*v.values())
++"""
++print('_'*100)
++
++"""dc = dict()
++
++for i in ['artist', 'album', 'song']:
++    dc.update({i: f'{i}_name'})
++    print(dc)"""
++
++
++
++x = ['song_text', 2, 'lol']
++print(x.pop(x.index('song_text')))
+\ No newline at end of file
