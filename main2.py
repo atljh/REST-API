@@ -20,12 +20,9 @@ def db_request(query):
     return result
 
 
-def translate(result, translate_to):
-    song_text = result[0].get('song_text')
+def translate(song_text, translate_to):
     translated_text = translator.translate(song_text, dest=translate_to).text
-    result[0]['translated'] = translated_text
-    new_result = list(result[0].values())
-    return new_result
+    return translated_text
 
 
 class Router(object):
@@ -122,7 +119,9 @@ JOIN song on track_list.song_id = song.song_id
 JOIN album on track_list.album_id = album.album_id
 WHERE song.song_name = "{song_name}" AND artist_name="{artist}"'''
         result = db_request(query)
-        new_result = translate(result, translate_to)
+        translated_text = translate(result[0].get('song_text'), translate_to)
+        result[0]['translated'] = translated_text
+        new_result = list(result[0].values())
         return json.dumps(new_result, ensure_ascii=False)
 
 
