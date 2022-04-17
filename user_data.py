@@ -9,7 +9,6 @@ translator = Translator()
 def db_connect():
     data_base = os.environ.get('DB_NAME')
     conn = sqlite3.connect(data_base)
-    # conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     return cur, conn
 
@@ -30,9 +29,6 @@ def search(search_string):
     conn.close()
     print(search_dict)
     return search_dict
-
-
-# cur.execute("select * from lang where first_appeared=:year", {"year": 1972})
 
 
 def get_artist(artist_name):
@@ -73,8 +69,6 @@ def get_album(artist_name, album_name):
 
 def get_song(artist_name, song_name, translate_to):
     cur, conn = db_connect()
-    # song_data = cur.execute(f'''SELECT song.song_id, artist.artist_id FROM track_list JOIN artist ON track_list.artist_id = artist.artist_id
-    #  JOIN song ON track_list.song_id = song.song_id WHERE song.song_name="{song_name}" and artist.artist_name = "{artist_name}" ''').fetchall()
     song_data = cur.execute('''
                     SELECT track_list.track_num,
                         song.song_name,
@@ -108,8 +102,6 @@ def add_to_tracklist(song_id, artist_id, album_id, track_num):
     conn.commit()
     conn.close()
 
-
-# cur.execute("insert into lang values (?, ?)", ("C", 1972))
 
 
 def insert_song(song_data):
@@ -193,7 +185,6 @@ def smart_insert_album(album_data):
 def add_song(song_data):
     song_id = insert_song(song_data['song_information'])
     if song_id is None:
-        print('song exist')
         return 'Song exist'
     for artist_data in song_data['artist_information']:
         if artist_data.get('artist_name'):
@@ -216,7 +207,6 @@ def update_song(artist_name, song_name, song_data):
                 JOIN song on track_list.song_id = song.song_id
                 WHERE song_name =:song_name AND artist_name=:artist_name''',
                           {'song_name': song_name, 'artist_name': artist_name}).fetchone()[0]
-    print('song_id=', song_id)
     cur.execute('''
                 UPDATE song
                 SET song_name =:song_name, song_text=:song_text, song_year=:song_year, origin_lang=:origin_lang 
