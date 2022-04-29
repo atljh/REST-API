@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ artist_name }}</title>
+</head>
+<body>
+<h1>{{ artist_name }}</h1>
+ <ul>
+        {% for one_album in album_list %}
+        <li><a href="/artist/{{ artist_name }}/album/{{one_album['album_name']}}">{{one_album['album_name']}}</a></li>
+        {% endfor %}
+ </ul>
+
+</body>
+</html>

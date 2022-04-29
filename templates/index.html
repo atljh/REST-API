@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Artists</title>
+</head>
+<body>
+    {% for one_artist in artist_list %}
+    <p><a href="/artist/{{ one_artist['artist_name'] }}">{{one_artist['artist_name']}}</a></p>
+    {% endfor %}
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    {% for one_song in song_list %}
+    <p><a href="/artist/{{ one_song['artist_name'] }}/song/{{ one_song['song_name'] }}">{{ one_song['song_name'] }}</a></p>
+    {% endfor %}
+    {% for one_artist in artist_list %}
+    <p><a href="/artist/{{ one_artist['artist_name'] }}">{{ one_artist['artist_name'] }}</a></p>
+    {% endfor %}
+    {% for one_album in album_list %}
+    <p><a href="/artist/{{ one_album['artist_name'] }}/album/{{ one_album['album_name'] }}">{{ one_album['album_name'] }}</a></p>
+    {% endfor %}
+
+</body>
+</html>

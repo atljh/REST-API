@@ -1,16 +1,12 @@
-import os
 import sqlite3
-from dotenv import load_dotenv
 from googletrans import Translator
+from models import artist as artist_model, song as song_model, album as album_model, track_list as track_list_model
+from models import delete_smth, create_smth, commit_me
+from models import db
+from serializers import Song, Album, Artist
+
 
 translator = Translator()
-
-
-def db_connect():
-    data_base = os.environ.get('DB_NAME')
-    conn = sqlite3.connect(data_base)
-    cur = conn.cursor()
-    return cur, conn
 
 
 def translate(song_text, translate_to):
@@ -18,180 +14,154 @@ def translate(song_text, translate_to):
     return translated_text
 
 
+def index():
+    all_artists = artist_model.query.add_columns(artist_model.artist_name).all()
+    all_artists = [dict(itm) for itm in all_artists]
+    all_artist_dict = {'artist_list': all_artists}
+    return all_artist_dict
+
+
 def search(search_string):
-    cur, conn = db_connect()
-    search_dict = {
-        'artist': cur.execute(
-            "SELECT artist_name FROM artist WHERE artist_name LIKE '%" + search_string + "%'").fetchall(),
-        'album': cur.execute("SELECT album_name FROM album WHERE album_name LIKE '%" + search_string + "%'").fetchall(),
-        'song': cur.execute("SELECT song_name FROM song WHERE song_name LIKE '%" + search_string + "%'").fetchall()
-    }
-    conn.close()
-    print(search_dict)
+    result_song = song_model.query.join(track_list_model, track_list_model.song_id == song_model.song_id) \
+        .join(artist_model, artist_model.artist_id == track_list_model.artist_id) \
+        .add_columns(artist_model.artist_name, song_model.song_name) \
+        .filter(song_model.song_name.like(f'%{search_string}%')).all()
+    result_album = album_model.query \
+        .join(track_list_model, track_list_model.album_id == album_model.album_id) \
+        .join(artist_model, track_list_model.artist_id == artist_model.artist_id) \
+        .add_columns(artist_model.artist_name, album_model.album_name) \
+        .filter(album_model.album_name.like(f'%{search_string}%')).all()
+    result_artist = artist_model.query \
+        .add_columns(artist_model.artist_name) \
+        .filter(artist_model.artist_name.like(f'%{search_string}%')).all()
+    search_result = {
+                    'song': [dict(itm) for itm in result_song],
+                    'album': [dict(itm) for itm in result_album],
+                    'artist': [dict(itm) for itm in result_artist]
+                     }
+    search_dict = {'song_list': search_result['song'], 'album_list': search_result['album'], 'artist_list': search_result['artist']}
     return search_dict
 
 
 def get_artist(artist_name):
-    cur, conn = db_connect()
-    artist_data = cur.execute('''
-                    select DISTINCT
-                    artist.artist_name, album.album_name
-                    FROM track_list
-                    JOIN artist on track_list.artist_id = artist.artist_id
-                    JOIN album on track_list.album_id = album.album_id
-                    WHERE artist.artist_name =:artist_name''',
-                              {"artist_name": artist_name}).fetchall()
-    conn.close()
-    artist_data = [row for row in artist_data[0]]
-    return artist_data
+    artist_data = artist_model.query.join(track_list_model, track_list_model.artist_id == artist_model.artist_id) \
+        .join(album_model, track_list_model.album_id == album_model.album_id) \
+        .add_columns(artist_model.artist_name, album_model.album_name) \
+        .filter(artist_model.artist_name == artist_name).all()
+    artist_data = [dict(itm) for itm in artist_data]
+    artist_dict = {'album_list': artist_data, 'artist_name': artist_name}
+    return artist_dict
 
 
 def get_album(artist_name, album_name):
-    cur, conn = db_connect()
-    album_data = cur.execute('''
-                    SELECT track_list.track_num, song.song_name,
-                         song.song_year,
-                         artist.artist_name,    
-                         album.album_name,
-                         album.album_year,
-                         album.album_info
-                    FROM track_list
-                    JOIN song on track_list.song_id = song.song_id
-                    JOIN album on track_list.album_id = album.album_id
-                    JOIN artist on track_list.artist_id = artist.artist_id  
-                    WHERE album.album_name=:album_name
-                    AND artist.artist_name=:artist_name''',
-                             {"album_name": album_name, "artist_name": artist_name}).fetchall()
-    conn.close()
-    album_data = [row for row in album_data[0]]
-    return album_data
+    album_data = album_model.query.join(track_list_model, track_list_model.album_id == album_model.album_id) \
+        .join(song_model, track_list_model.song_id == song_model.song_id) \
+        .join(artist_model, track_list_model.artist_id == artist_model.artist_id) \
+        .add_columns(track_list_model.track_num, song_model.song_name, artist_model.artist_name, album_model.album_name, album_model.album_year,
+                     album_model.album_info) \
+        .filter(album_model.album_name == album_name) \
+        .filter(artist_model.artist_name == artist_name).all()
+    album_data = [dict(itm) for itm in album_data]
+    album_dict = {'songs_list': album_data, 'artist_name': artist_name, 'album_name': album_name,
+            'album_info': album_data[0]['album_info'], 'track_num': album_data[0]['track_num']}
+    return album_dict
 
 
 def get_song(artist_name, song_name, translate_to):
-    cur, conn = db_connect()
-    song_data = cur.execute('''
-                    SELECT track_list.track_num,
-                        song.song_name,
-                        song.song_year,
-                        song.song_text,
-                        song. origin_lang,
-                        artist.artist_name,
-                        album.album_name
-                    FROM track_list
-                    JOIN artist on track_list.artist_id = artist.artist_id
-                    JOIN song on track_list.song_id = song.song_id
-                    JOIN album on track_list.album_id = album.album_id
-                    WHERE song.song_name=:song_name AND artist_name=:artist_name''',
-                            {"artist_name": artist_name, "song_name": song_name}).fetchall()
-
-    conn.close()
-    song_data = [row for row in song_data[0]]
-    translated_text = translate(song_data[3], translate_to)
-    song_data.append(translated_text)
-    return song_data
+    song_data = song_model.query.join(track_list_model, track_list_model.song_id == song_model.song_id) \
+        .join(artist_model, track_list_model.artist_id == artist_model.artist_id) \
+        .join(album_model, track_list_model.album_id == album_model.album_id) \
+        .add_columns(song_model.song_name, song_model.song_year, song_model.song_text, song_model.origin_lang,
+                     artist_model.artist_name, album_model.album_name) \
+        .filter(song_model.song_name == song_name) \
+        .filter(artist_model.artist_name == artist_name).all()
+    song_data = [dict(itm) for itm in song_data]
+    song_dict = {'artist_name': artist_name, 'album_name': song_data[0]['album_name'], 'song_name': song_name,
+            'song_text': song_data[0]['song_text'], 'song_year': song_data[0]['song_year'],
+            'origin_lang': song_data[0]['origin_lang']}
+    translated_text = translate(song_data[0]['song_text'], translate_to)
+    song_dict.update({'translated_text': translated_text})
+    return song_dict
 
 
 def add_to_tracklist(song_id, artist_id, album_id, track_num):
-    cur, conn = db_connect()
-    cur.execute('''INSERT
-                   INTO track_list
-                   (song_id, artist_id, album_id, track_num)
-                   VALUES
-                   (?, ?, ?, ?)''',
-                (song_id, artist_id, album_id, int(track_num)))
-    conn.commit()
-    conn.close()
-
+    track_list = track_list_model(song_id=song_id, artist_id=artist_id, album_id=album_id, track_num=track_num)
+    create_smth(track_list)
 
 
 def insert_song(song_data):
-    cur, conn = db_connect()
-    song_exist = cur.execute('''
-                SELECT song.song_id
-                FROM song
-                WHERE
-                song.song_name =:song_name AND song.song_text =:song_text''',
-                             {'song_name': song_data['song_name'], 'song_text': song_data['song_text']}).fetchone()
-    id_song = None
-    if not song_exist:
-        cur.execute('''
-                INSERT 
-                INTO song 
-                (song_name, song_text, song_year, origin_lang) 
-                VALUES 
-                (?, ?, ?, ?)''',
-                    (song_data['song_name'], song_data['song_text'], song_data['song_year'], song_data['origin_lang']))
-        conn.commit()
-        id_song = cur.execute('''
-                SELECT song.song_id
-                FROM song
-                WHERE song.song_name =:song_name''',
-                              {'song_name': song_data['song_name']}).fetchone()
-        return id_song[0]
+    song_query = song_model.query \
+        .add_columns(song_model.song_id) \
+        .filter(song_model.song_name == song_data['song_name']) \
+        .filter(song_model.song_text == song_data['song_text']).first()
+    song_id = None
+    if not song_query:
+        errors = Song.validate(song_data)
+        if errors:
+            print(errors)
+            return errors
+        song = song_model(song_name=song_data['song_name'], song_text=song_data['song_text'],
+                              song_year=song_data['song_year'], origin_lang=song_data['origin_lang'])
+        create_smth(song)
+        song_id = song.song_id
     else:
         pass
-    conn.close()
-    return id_song
+    return song_id
 
 
-def smart_insert_artist(artist_data):
-    cur, conn = db_connect()
-    id_artist = cur.execute('''
-                SELECT artist.artist_id
-                FROM artist
-                WHERE artist.artist_name =:artist_name''',
-                            {'artist_name': artist_data['artist_name']}).fetchone()
-    if not id_artist:
-        cur.execute('''
-                INSERT
-                INTO artist
-                (artist_name, artist_info) 
-                VALUES
-                (?, ?)''',
-                    (artist_data['artist_name'], artist_data['artist_info']))
-        conn.commit()
-        id_artist = cur.execute('''
-                SELECT artist.artist_id
-                FROM artist
-                WHERE artist.artist_name =:artist_name''',
-                                {'artist_name': artist_data['artist_name']}).fetchone()[0]
-    conn.close()
-    return id_artist
+def insert_artist(artist_data):
+    artist_query = artist_model.query \
+        .add_columns(artist_model.artist_id) \
+        .filter(artist_model.artist_name == artist_data['artist_name']) \
+        .filter(artist_model.artist_info == artist_data['artist_info']).first()
+    artist_id = None
+    if not artist_query:
+        errors = Artist.validate({'artist_info': artist_data.get('artist_info'), 'artist_name': artist_data.get('artist_name')})
+        if errors:
+            print(errors)
+            return errors
+        artist = artist_model(artist_name=artist_data['artist_name'], artist_info=artist_data['artist_info'])
+        create_smth(artist)
+        artist_id = artist.artist_id
+    else:
+        pass
+    return artist_id
 
 
-def smart_insert_album(album_data):
-    cur, conn = db_connect()
-    id_album = cur.execute('''
-                SELECT album.album_id 
-                FROM album
-                WHERE album.album_name =:album_name''',
-                           {'album_name': album_data['album_name']}).fetchone()
-    if not id_album:
-        cur.execute('''
-                INSERT INTO album (album_name, album_year, album_info)
-                VALUES
-                (?, ?, ?)''',
-                    (album_data['album_name'], album_data['album_year'], album_data['album_info']))
-        conn.commit()
-        id_album = cur.execute('''
-                SELECT album.album_id 
-                FROM album
-                WHERE album.album_name =:album_name''',
-                               {'album_name': album_data['album_name']}).fetchone()
-    conn.close()
-    return id_album[0], album_data['track_num']
+def insert_album(album_data):
+    album_query = album_model.query \
+        .add_columns(album_model.album_id) \
+        .filter(album_model.album_name == album_data['album_name']) \
+        .filter(album_model.album_info == album_data['album_info']).first()
+    album_id = None
+    track_num = None
+    if not album_query:
+        errors = Album.validate(album_data)
+        if errors:
+            print('alb_errors', errors)
+            return errors
+        album = album_model(album_name=album_data['album_name'], album_year=album_data['album_year'],
+                            album_info=album_data['album_info'])
+        create_smth(album)
+        album_id = album.album_id
+        track_num = album_data['track_num']
+    else:
+        pass
+    print(album_id, track_num)
+    return album_id, track_num
 
 
 def add_song(song_data):
     song_id = insert_song(song_data['song_information'])
     if song_id is None:
+        print('song exist')
         return 'Song exist'
     for artist_data in song_data['artist_information']:
         if artist_data.get('artist_name'):
-            artist_id = smart_insert_artist(artist_data)
+            artist_id = insert_artist(artist_data)
             for album_data in artist_data['album_information']:
                 if album_data.get('album_name'):
-                    album_id, track_num = smart_insert_album(album_data)
+                    album_id, track_num = insert_album(album_data)
                     add_to_tracklist(song_id, artist_id, album_id, track_num)
         else:
             # add_to_tracklist(song_id, artist_id, None, None)
@@ -199,113 +169,86 @@ def add_song(song_data):
 
 
 def update_song(artist_name, song_name, song_data):
-    cur, conn = db_connect()
-    song_id = cur.execute('''
-                SELECT song.song_id
-                FROM track_list
-                JOIN artist on track_list.artist_id = artist.artist_id
-                JOIN song on track_list.song_id = song.song_id
-                WHERE song_name =:song_name AND artist_name=:artist_name''',
-                          {'song_name': song_name, 'artist_name': artist_name}).fetchone()[0]
-    cur.execute('''
-                UPDATE song
-                SET song_name =:song_name, song_text=:song_text, song_year=:song_year, origin_lang=:origin_lang 
-                WHERE song_id =:song_id''',
-                {'song_name': song_data['song_name'], 'song_text': song_data['song_text'],
-                 'song_year': song_data['song_year'], 'origin_lang': song_data['origin_lang'], 'song_id': song_id})
-
-    conn.commit()
-    conn.close()
+    errors = Song.validate(song_data)
+    if errors:
+        return errors
+    song_query = song_model.query.join(track_list_model, track_list_model.song_id == song_model.song_id) \
+        .join(artist_model, artist_model.artist_id == track_list_model.artist_id).add_columns(song_model.song_id) \
+        .filter(artist_model.artist_name == artist_name)\
+        .filter(song_model.song_name == song_name).first()
+    song_id = song_query.song_id
+    song = song_model.query.get(song_id)
+    song.song_name = song_data['song_name']
+    song.song_text = song_data['song_text']
+    song.song_year = song_data['song_year']
+    song.origin_lang = song_data['origin_lang']
+    db.session.commit()
 
 
 def update_album(artist_name, album_name, album_data):
-    cur, conn = db_connect()
-    album_id = cur.execute('''
-                SELECT album.album_id
-                FROM track_list
-                JOIN artist on track_list.artist_id = artist.artist_id
-                JOIN album on track_list.album_id = album.album_id
-                WHERE artist_name =:artist_name AND album_name=:album_name''',
-                           {'artist_name': artist_name, 'album_name': album_name}).fetchone()[0]
-
-    cur.execute('''
-                UPDATE artist 
-                SET album_name =:album_name,
-                    album_year =:album_year,
-                    album_info =:album_info
-                WHERE album_id =:album_id''',
-                {'album_name': album_data['album_name'], 'album_info': album_data['artist_info'],
-                 'album_year': album_data['album_info'], 'album_id': album_id})
-    conn.commit()
-    conn.close()
+    errors = Album.validate(album_data)
+    if errors:
+        return errors
+    album_query = album_model.query.join(track_list_model,track_list_model.album_id == album_model.album_id) \
+        .join(artist_model, artist_model.artist_id == track_list_model.artist_id).add_columns(album_model.album_id) \
+        .filter(artist_model.artist_name == artist_name) \
+        .filter(album_model.album_name == album_name).first()
+    album_id = album_query.album_id
+    album = album_model.query.get(album_id)
+    album.album_name = album_data['album_name']
+    album.album_year = album_data['album_year']
+    album.album_info = album_data['album_info']
+    db.session.commit()
 
 
 def update_artist(artist_name, artist_data):
-    cur, conn = db_connect()
-    artist_id = cur.execute('''
-                SELECT artist.artist_id
-                FROM track_list
-                JOIN artist ON track_list.artist_id = artist.artist_id
-                WHERE artist_name =:artist_name''',
-                            {'artist_name': artist_name}).fetchone()[0]
-    cur.execute('''
-                UPDATE artist
-                SET artist_name =:artist_name,
-                    artist_info =: artist_info
-                WHERE artist.artist_id =: artist_id''',
-                {'artist_name': artist_data['artist_name'], 'artist_info': artist_data['artist_info'],
-                 'artist_id': artist_id})
-    conn.commit()
-    conn.close()
+    errors = Artist.validate(artist_data)
+    if errors:
+        return errors
+    artist_query = artist_model.query.add_columns(artist_model.artist_id) \
+        .filter(artist_model.artist_name == artist_name).first()
+    artist = artist_model.query.get(artist_query.artist_id)
+    artist.artist_name = artist_data['artist_name']
+    artist.artist_info = artist_data['artist_info']
+    db.session.commit()
 
 
 def delete_artist(artist_name):
-    cur, conn = db_connect()
-    artist_id = cur.execute('''
-                SELECT artist.artist_id
-                FROM track_list
-                JOIN artist ON track_list.artist_id = artist.artist_id
-                WHERE artist_name =:artist_name''',
-                            {'artist_name': artist_name}).fetchone()[0]
-
-    cur.execute('''
-                DELETE
-                FROM artist
-                WHERE artist.artist_id =:artist_id''', {'artist_id': artist_id})
-    conn.commit()
-    conn.close()
+    artist_query = artist_model.query.join(track_list_model, track_list_model.artist_id == artist_model.artist_id) \
+                .join(album_model, album_model.album_id == track_list_model.album_id) \
+                .join(song_model, song_model.song_id == track_list_model.song_id) \
+                .add_columns(artist_model.artist_id, album_model.album_id, song_model.song_id) \
+                .fliter(artist_model.artist_name == artist_name).first()
+    artist_id = artist_query.artist_id
+    album_id = artist_query.album_id
+    song_id = artist_query.song_id
+    artist = artist_model.get(artist_id)
+    album = album_model.get(album_id)
+    song = song_model.get(song_id)
+    track_list = track_list_model.get(artist_id)
+    print(track_list)
+    delete_smth(artist)
+    delete_smth(album)
+    delete_smth(song)
 
 
 def delete_album(album_name, artist_name):
-    cur, conn = db_connect()
-    album_id = cur.execute('''
-                SELECT album.album_id
-                FROM track_list
-                JOIN artist on track_list.artist_id = artist.artist_id
-                JOIN album on track_list.album_id = album.album_id
-                WHERE artist_name =:artist_name AND album_name=:album_name''',
-                           {'artist_name': artist_name, 'album_name': album_name}).fetchone()[0]
-
-    cur.execute('''
-                DELETE 
-                FROM album
-                WHERE album.album_id=:album_id''', {'album_id': album_id})
-    conn.commit()
-    conn.close()
+    album_query = album_model.query.join(track_list_model, track_list_model.album_id == album_model.album_id) \
+                .join(artist_model, artist_model.artist_id == track_list_model.artist_id) \
+                .add_columns(album_model.album_id) \
+                .filter(artist_model.artist_name == artist_name) \
+                .filter(album_model.album_name == album_name).first()
+    album_id = album_query.album_id
+    album = album_model.get(album_id)
+    delete_smth(album)
 
 
 def delete_song(song_name, artist_name):
-    cur, conn = db_connect()
-    song_id = cur.execute('''
-                SELECT song.song_id
-                FROM track_list
-                JOIN artist on track_list.artist_id = artist.artist_id
-                JOIN song on track_list.song_id = song.song_id
-                WHERE song_name =:song_name AND artist_name=:artist_name''',
-                          {'song_name': song_name, 'artist_name': artist_name}).fetchone()[0]
-    cur.execute('''
-                DELETE
-                FROM song
-                WHERE song.song_id =:song_id''', {'song_id': song_id})
-    conn.commit()
-    conn.close()
+    song_query = song_model.query.join(track_list_model, track_list_model.song_id == song_model.song_id) \
+                .join(artist_model, artist_model.artist_id == track_list_model.artist_id)\
+                .add_columns(song_model.song_id) \
+                .filter(artist_model.artist_name == artist_name) \
+                .filter(song_model.song_name == song_name).first()
+    song_id = song_query.song_id
+    song = song_model.query.get(song_id)
+    delete_smth(  song)

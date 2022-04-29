@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ artist_name }} - {{ album_name }}</title>
+</head>
+<body>
+<h1><a href="/artist/{{ artist_name }}">{{ artist_name }}</a></h1>
+<h2>{{ album_name }}</h2>
+<p>{{album_info}}</p>
+ <ul>
+        {% for one_song in songs_list %}
+        <li><a href="/artist/{{ artist_name }}/song/{{one_song['song_name']}}">{{ track_num }} {{one_song['song_name']}}</a></li>
+        {% endfor %}
+ </ul>
+</body>
+</html>
