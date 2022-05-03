@@ -2,13 +2,15 @@ from flask import Flask, request, render_template
 import user_data
 import os
 from models import db
-
+import config
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.environ.get("DB_NAME")}'
+# app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.environ.get("DB_NAME")}'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{config.DB_NAME}'
 db.init_app(app)
-
+# with app.app_context():
+#     db.create_all()
 
 @app.route('/')
 def index():
@@ -83,4 +85,4 @@ def add_song():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=False, threaded=True)
